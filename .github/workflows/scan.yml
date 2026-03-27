@@ -11,7 +11,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   scan:
@@ -25,6 +24,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Lowercase image name
+        id: image
+        run: echo "ref=${{ env.REGISTRY }}/${{ github.repository }}:latest" | tr '[:upper:]' '[:lower:]' >> $GITHUB_OUTPUT
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -35,7 +38,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          image-ref: ${{ steps.image.outputs.ref }}
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
