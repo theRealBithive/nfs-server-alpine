@@ -81,6 +81,45 @@ spec:
 
 Note that AllowPrivilegeEscalation is automatically set to true when privileged mode is set to true or the SYS_ADMIN capability added.
 
+##### Mounting Per Subpath in Kubernetes
+
+When this image exports a root share via `SHARED_DIRECTORY` (for example `/exports`), Kubernetes workloads commonly mount specific child directories using `subPath`.
+
+This pattern is useful when the NFS-backed PVC represents the root and your application needs separate mount points like `/media` and `/internal`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test
+  namespace: test
+spec:
+  replicas: 5
+  template:
+    spec:
+      containers:
+        - name: consumer
+          image: busybox:1.37
+          volumeMounts:
+            - name: media
+              mountPath: /media
+              subPath: media
+            - name: internal
+              mountPath: /internal
+              subPath: internal
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: test-media-rwx-csi-root
+        - name: internal
+          persistentVolumeClaim:
+            claimName: test-internal-rwx-csi-root
+```
+
+Important notes:
+
+- Ensure subdirectories exist on the NFS export root before pods start (for example with an init container that creates `/exports/media` and `/exports/internal`).
+
 #### Docker Compose v2/v3 or Rancher v1.x
 
 When using Docker Compose you can specify privileged mode like so:
