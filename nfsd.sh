@@ -20,6 +20,30 @@ stop()
   exit
 }
 
+nfsd_threads_running()
+{
+  if [ ! -r /proc/fs/nfsd/threads ]; then
+    return 1
+  fi
+
+  threads="$(cat /proc/fs/nfsd/threads)"
+  [ "${threads}" -gt 0 ]
+}
+
+start_rpc_nfsd()
+{
+  # Prefer an explicit v4 start when supported by nfs-utils, then fall back.
+  /usr/sbin/rpc.nfsd --debug 8 --no-udp --nfs-version 4 \
+    || /usr/sbin/rpc.nfsd --debug 8 --no-udp --no-nfs-version 2 --no-nfs-version 3
+}
+
+start_rpc_mountd()
+{
+  # Keep mountd aligned with the nfsd version policy.
+  /usr/sbin/rpc.mountd --debug all --no-udp --nfs-version 4 \
+    || /usr/sbin/rpc.mountd --debug all --no-udp --no-nfs-version 2 --no-nfs-version 3
+}
+
 rm /etc/exports
 
 # Check if the SHARED_DIRECTORY variable is empty
@@ -110,7 +134,18 @@ while true; do
     echo "Mounting nfsd filesystem..."
     mount -t nfsd nfsd /proc/fs/nfsd
     echo "Starting NFS in the background..."
-    /usr/sbin/rpc.nfsd --debug 8 --no-udp --no-nfs-version 2 --no-nfs-version 3
+    if ! start_rpc_nfsd; then
+      echo "Failed to start rpc.nfsd, sleeping for 2s, then retrying..."
+      sleep 2
+      continue
+    fi
+
+    if ! nfsd_threads_running; then
+      echo "rpc.nfsd appears not to be running (0 threads), sleeping for 2s, then retrying..."
+      sleep 2
+      continue
+    fi
+
     echo "Exporting File System..."
     if /usr/sbin/exportfs -rv; then
       /usr/sbin/exportfs
@@ -119,7 +154,11 @@ while true; do
       exit 1
     fi
     echo "Starting Mountd in the background..."
-    /usr/sbin/rpc.mountd --debug all --no-udp --no-nfs-version 2 --no-nfs-version 3
+    if ! start_rpc_mountd; then
+      echo "Failed to start rpc.mountd, sleeping for 2s, then retrying..."
+      sleep 2
+      continue
+    fi
 # --exports-file /etc/exports
 
     # Check if NFS is now running by recording it's PID (if it's not running $pid will be null):
@@ -145,9 +184,13 @@ while true; do
 
   # Check if NFS is STILL running by recording it's PID (if it's not running $pid will be null):
   pid=`pidof rpc.mountd`
+  nfsd_threads_ok=0
+  if nfsd_threads_running; then
+    nfsd_threads_ok=1
+  fi
   # If it is not, lets kill our PID1 process (this script) by breaking out of this while loop:
   # This ensures Docker observes the failure and handles it as necessary
-  if [ -z "$pid" ]; then
+  if [ -z "$pid" ] || [ "$nfsd_threads_ok" -ne 1 ]; then
     echo "NFS has failed, exiting, so Docker can restart the container..."
     break
   fi
