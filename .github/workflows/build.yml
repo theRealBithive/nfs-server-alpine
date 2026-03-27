@@ -18,7 +18,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
@@ -58,3 +58,31 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Generate release tag
+        id: tag
+        run: |
+          DATE=$(date +'%Y.%m.%d')
+          SHA=$(git rev-parse --short HEAD)
+          echo "value=v${DATE}-${SHA}" >> $GITHUB_OUTPUT
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.value }}
+          name: ${{ steps.tag.outputs.value }}
+          body: |
+            ## Docker Image
+
+            ```
+            docker pull ghcr.io/therealbithive/nfs-server-alpine:latest
+            ```
+
+            ### Changes
+            ${{ github.event_name == 'schedule' && 'Scheduled weekly rebuild — picks up latest Alpine security patches.' || github.event.head_commit.message }}
+
+            ### Image tags
+            `latest` · `sha-${{ github.sha }}` (short: `sha-${{ steps.tag.outputs.value }}`)
+
+            Platforms: `linux/amd64` · `linux/arm64` · `linux/arm/v7`
+          make_latest: true
