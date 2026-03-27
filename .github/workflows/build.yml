@@ -40,7 +40,8 @@ jobs:
 
       - name: Extract Alpine version from Dockerfile
         id: alpine
-        run: echo "version=$(grep '^FROM alpine:' Dockerfile | cut -d: -f2)" >> $GITHUB_OUTPUT
+        run: |
+          echo "version=$(grep '^FROM alpine:' Dockerfile | cut -d: -f2)" >> $GITHUB_OUTPUT
 
       - name: Extract metadata
         id: meta
