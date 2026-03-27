@@ -2,42 +2,23 @@
 
 A handy NFS Server image comprising Alpine Linux and NFS v4 only, over TCP on port 2049.
 
+> **This is a maintained fork** of [sjiveson/nfs-server-alpine](https://github.com/sjiveson/nfs-server-alpine). It is a drop-in replacement with the same behaviour, updated to current Alpine Linux and rebuilt automatically every week via GitHub Actions.
+>
+> Image available at: `ghcr.io/therealbithive/nfs-server-alpine:latest`
+
 ## Overview
 
 The image comprises of;
 
-- [Alpine Linux](http://www.alpinelinux.org/) v3.8.1. Alpine Linux is a security-oriented, lightweight Linux distribution based on [musl libc](https://www.musl-libc.org/) (v1.1.19) and [BusyBox](https://www.busybox.net/).
-- NFS v4 only, over TCP on port 2049. Rpcbind is enabled for now to overcome a bug with slow startup, it shouldn't be required.
-
-[Confd](https://www.confd.io/) is no longer used, making the image simpler & smaller and providing wider device compatibility.
-
-For ARM versions, tag 6-arm is based on [hypriot/rpi-alpine](https://github.com/hypriot/rpi-alpine) and tag 7 onwards based on the stock Alpine image. Tag 7 uses confd v0.16.0.
-
-For previous tags 7, 8 & 9;
-
-- Alpine Linux v3.7.0
-- Musl v1.1.18
-- Confd v0.14.0
-
-For previous tag 6;
-
-- Alpine Linux v3.6.0
-- Musl v1.1.15
-
-For previous tag 5;
-
-- Confd v0.13.0
-
-For previous tag 4;
-
-- Alpine Linux v3.5
-- Confd v0.12.0-dev
-
-**Note:** There were some serious flaws with image versions 3 and earlier. Please use **4** or later. The earlier version are only here in case they are used in automated workflows.
+- [Alpine Linux](http://www.alpinelinux.org/) 3.23.3. Alpine Linux is a security-oriented, lightweight Linux distribution based on [musl libc](https://www.musl-libc.org/) and [BusyBox](https://www.busybox.net/).
+- NFS v4 only, over TCP on port 2049. Rpcbind is enabled to overcome a bug with slow startup on some kernels.
+- Multi-arch: `linux/amd64`, `linux/arm64`, `linux/arm/v7`
+- Weekly automated rebuilds to pull in Alpine security patches
+- Trivy vulnerability scanning on every build
 
 When run, this container will make whatever directory is specified by the environment variable SHARED_DIRECTORY available to NFS v4 clients.
 
-`docker run -d --name nfs --privileged -v /some/where/fileshare:/nfsshare -e SHARED_DIRECTORY=/nfsshare itsthenetwork/nfs-server-alpine:latest`
+`docker run -d --name nfs --privileged -v /some/where/fileshare:/nfsshare -e SHARED_DIRECTORY=/nfsshare ghcr.io/therealbithive/nfs-server-alpine:latest`
 
 Add `--net=host` or `-p 2049:2049` to make the shares externally accessible via the host networking stack. This isn't necessary if using [Rancher](https://rancher.com/) or linking containers in some other way.
 
