@@ -38,6 +38,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Extract Alpine version from Dockerfile
+        id: alpine
+        run: echo "version=$(grep '^FROM alpine:' Dockerfile | cut -d: -f2)" >> $GITHUB_OUTPUT
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -45,6 +49,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.alpine.outputs.version }}
             type=sha,prefix=sha-
             type=schedule,pattern={{date 'YYYY-MM-DD'}}
 
@@ -59,30 +64,21 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Generate release tag
-        id: tag
-        run: |
-          DATE=$(date +'%Y.%m.%d')
-          SHA=$(git rev-parse --short HEAD)
-          echo "value=v${DATE}-${SHA}" >> $GITHUB_OUTPUT
-
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.value }}
-          name: ${{ steps.tag.outputs.value }}
+          tag_name: ${{ steps.alpine.outputs.version }}
+          name: Alpine ${{ steps.alpine.outputs.version }}
           body: |
             ## Docker Image
 
             ```
+            docker pull ghcr.io/therealbithive/nfs-server-alpine:${{ steps.alpine.outputs.version }}
             docker pull ghcr.io/therealbithive/nfs-server-alpine:latest
             ```
 
             ### Changes
             ${{ github.event_name == 'schedule' && 'Scheduled weekly rebuild — picks up latest Alpine security patches.' || github.event.head_commit.message }}
-
-            ### Image tags
-            `latest` · `sha-${{ github.sha }}` (short: `sha-${{ steps.tag.outputs.value }}`)
 
             Platforms: `linux/amd64` · `linux/arm64` · `linux/arm/v7`
           make_latest: true
