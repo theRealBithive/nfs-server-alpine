@@ -1,4 +1,4 @@
-FROM alpine:3.21
+FROM alpine:3.23.3
 LABEL maintainer="Steven Iveson <steve@iveson.eu>"
 LABEL org.opencontainers.image.source="https://github.com/sjiveson/nfs-server-alpine"
 LABEL org.opencontainers.image.description="NFS v4 server based on Alpine Linux"
