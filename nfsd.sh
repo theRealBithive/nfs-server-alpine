@@ -107,6 +107,8 @@ while true; do
     # /usr/sbin/rpc.gssd -v
     # /usr/sbin/rpc.statd
 
+    echo "Mounting nfsd filesystem..."
+    mount -t nfsd nfsd /proc/fs/nfsd
     echo "Starting NFS in the background..."
     /usr/sbin/rpc.nfsd --debug 8 --no-udp --no-nfs-version 2 --no-nfs-version 3
     echo "Exporting File System..."
