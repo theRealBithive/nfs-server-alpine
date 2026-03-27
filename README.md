@@ -5,6 +5,8 @@ A handy NFS Server image comprising Alpine Linux and NFS v4 only, over TCP on po
 > **This is a maintained fork** of [sjiveson/nfs-server-alpine](https://github.com/sjiveson/nfs-server-alpine). It is a drop-in replacement with the same behaviour, updated to current Alpine Linux and rebuilt automatically every week via GitHub Actions.
 >
 > Image available at: `ghcr.io/therealbithive/nfs-server-alpine:latest`
+>
+> Maintenance of this fork — dependency updates, security patches, and CI/CD — is largely handled by [Claude Code](https://claude.ai/code).
 
 ## Overview
 
@@ -282,6 +284,10 @@ RUN chmod +x /usr/bin/nfsd.sh
 ENTRYPOINT ["/usr/bin/nfsd.sh"]
 ```
 
-### Acknowlegements
+### Acknowledgements
 
 Thanks to Torsten Bronger @bronger for the suggestion and help around implementing a multistage Docker build to better handle the inclusion of Confd (since removed).
+
+---
+
+> Maintained with [Claude Code](https://claude.ai/code) — automated dependency updates, security scanning, and CI/CD configuration.
