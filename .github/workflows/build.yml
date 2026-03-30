@@ -7,10 +7,12 @@ on:
     # Every Monday at 04:00 UTC — picks up Alpine base image security patches
     - cron: "0 4 * * 1"
   workflow_dispatch:
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,10 +28,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          alpine=$(grep '^FROM alpine:' Dockerfile | cut -d: -f2)
-          prefix="${alpine}."
+          # Read major.minor from VERSION file
+          base=$(cat VERSION | tr -d '[:space:]')
 
-          # Find the latest release matching this Alpine major.minor
+          # Find the latest release matching this major.minor prefix
+          prefix="${base}."
           last=$(gh release list --json tagName -q \
             "[.[] | select(.tagName | startswith(\"${prefix}\"))][0].tagName // empty")
 
@@ -39,7 +42,13 @@ jobs:
             patch=$(( ${last##*.} + 1 ))
           fi
 
-          echo "tag=${prefix}${patch}" >> "$GITHUB_OUTPUT"
+          tag="${prefix}${patch}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "base=${base}" >> "$GITHUB_OUTPUT"
+          echo "→ Next version: ${tag}"
+
+          # Extract Alpine version for metadata
+          alpine=$(grep '^FROM alpine:' Dockerfile | cut -d: -f2)
           echo "alpine=${alpine}" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
@@ -62,8 +71,8 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ steps.version.outputs.alpine }}
             type=raw,value=${{ steps.version.outputs.tag }}
+            type=raw,value=${{ steps.version.outputs.base }}
             type=sha,prefix=sha-
 
       - name: Build and push
@@ -81,19 +90,21 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: Alpine ${{ steps.version.outputs.tag }}
+          name: v${{ steps.version.outputs.tag }}
           body: |
             ## Docker Image
 
             ```
             docker pull ghcr.io/therealbithive/nfs-server-alpine:${{ steps.version.outputs.tag }}
-            docker pull ghcr.io/therealbithive/nfs-server-alpine:${{ steps.version.outputs.alpine }}
+            docker pull ghcr.io/therealbithive/nfs-server-alpine:${{ steps.version.outputs.base }}
             docker pull ghcr.io/therealbithive/nfs-server-alpine:latest
             ```
 
-            ### Changes
+            ### Details
 
-            ${{ github.event_name == 'schedule' && 'Scheduled weekly rebuild — picks up latest Alpine security patches.' || github.event.head_commit.message }}
+            - **Trigger:** ${{ github.event_name == 'schedule' && 'Weekly security rebuild' || github.event_name == 'workflow_dispatch' && 'Manual trigger' || 'Code change' }}
+            - **Alpine base:** `${{ steps.version.outputs.alpine }}`
+            - **Platforms:** `linux/amd64` · `linux/arm64` · `linux/arm/v7`
 
-            Platforms: `linux/amd64` · `linux/arm64` · `linux/arm/v7`
+            ${{ github.event_name == 'push' && format('### Changes\n\n{0}', github.event.head_commit.message) || '' }}
           make_latest: true
