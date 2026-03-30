@@ -1,5 +1,4 @@
 name: Build and Push
-
 on:
   push:
     branches:
@@ -8,22 +7,40 @@ on:
     # Every Monday at 04:00 UTC — picks up Alpine base image security patches
     - cron: "0 4 * * 1"
   workflow_dispatch:
-
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: write
       packages: write
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Determine next version
+        id: version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          alpine=$(grep '^FROM alpine:' Dockerfile | cut -d: -f2)
+          prefix="${alpine}."
+
+          # Find the latest release matching this Alpine major.minor
+          last=$(gh release list --json tagName -q \
+            "[.[] | select(.tagName | startswith(\"${prefix}\"))][0].tagName // empty")
+
+          if [ -z "$last" ]; then
+            patch=0
+          else
+            patch=$(( ${last##*.} + 1 ))
+          fi
+
+          echo "tag=${prefix}${patch}" >> "$GITHUB_OUTPUT"
+          echo "alpine=${alpine}" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -38,11 +55,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Alpine version from Dockerfile
-        id: alpine
-        run: |
-          echo "version=$(grep '^FROM alpine:' Dockerfile | cut -d: -f2)" >> $GITHUB_OUTPUT
-
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -50,9 +62,9 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ steps.alpine.outputs.version }}
+            type=raw,value=${{ steps.version.outputs.alpine }}
+            type=raw,value=${{ steps.version.outputs.tag }}
             type=sha,prefix=sha-
-            type=schedule,pattern={{date 'YYYY-MM-DD'}}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -68,17 +80,19 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.alpine.outputs.version }}
-          name: Alpine ${{ steps.alpine.outputs.version }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Alpine ${{ steps.version.outputs.tag }}
           body: |
             ## Docker Image
 
             ```
-            docker pull ghcr.io/therealbithive/nfs-server-alpine:${{ steps.alpine.outputs.version }}
+            docker pull ghcr.io/therealbithive/nfs-server-alpine:${{ steps.version.outputs.tag }}
+            docker pull ghcr.io/therealbithive/nfs-server-alpine:${{ steps.version.outputs.alpine }}
             docker pull ghcr.io/therealbithive/nfs-server-alpine:latest
             ```
 
             ### Changes
+
             ${{ github.event_name == 'schedule' && 'Scheduled weekly rebuild — picks up latest Alpine security patches.' || github.event.head_commit.message }}
 
             Platforms: `linux/amd64` · `linux/arm64` · `linux/arm/v7`
